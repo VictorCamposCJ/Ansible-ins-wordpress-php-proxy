@@ -1,0 +1,100 @@
+---
+#tasks file for ins-wordpress-conf-apache
+
+- name: Actualizar caché de los paquetes CentOS
+  yum:
+          name: '*'
+          state: latest
+          update_cache: true
+
+#- name: Importar clave para repositorio remi-release
+#  rpm_key:
+#          key: https://rpms.remirepo.net/enterprise/9/RPM-GPG-KEY-remi
+#          state: present
+
+#- name: Habilitar repositorios
+#  yum:
+#          name: https://rpms.remirepo.net/enterprise/remi-release-8.rpm, https://dl.fedoraproject.org/pub/epel/epel-next-release-latest-9.noarch.rpm
+#          state: present
+
+#- name: Habilitar módulo PHP 8.0 en Remi
+#  command: dnf module enable php:remi-8.0 -y
+
+- name: Instalar paquetes requeridos
+  yum:
+        name:
+          - php
+          - httpd
+          - php-cli
+          - php-fpm
+          - php-mysqlnd
+          - php-zip
+          - php-devel
+          - php-gd
+          - php-mcrypt
+          - php-mbstring
+          - php-curl
+          - php-xml
+          - php-pear
+          - php-bcmath
+        state: latest
+
+- name: Reiniciar modulo php-fpm si está instalado
+  service:
+          name: php-fpm
+          state: restarted
+  when: ansible_facts['services']['php-fpm'] is defined
+
+- name: Permitir tráfico HTTP a través del firewall
+  command: 
+    cmd: firewall-cmd --permanent --zone=public --add-service=http
+
+- name: Permitir tráfico HTTPS a través del firewall
+  command: 
+    cmd: firewall-cmd --permanent --zone=public --add-service=https
+
+- name: Recargar firewall
+  command: 
+    cmd: firewall-cmd --reload
+
+- name: Iniciar Apache web server
+  service:
+          name: httpd
+          state: started
+          enabled: true
+
+- name: Copiar ficheros de WordPress(instalacion)
+  unarchive:
+          src: https://wordpress.org/latest.tar.gz
+          dest: /var/www/
+          remote_src: yes
+          owner: apache
+          group: apache
+          mode: '0755'
+
+- name: Establecer configuración de Wordpress
+  template:
+          src: /home/vagrant/src/recursos/wp-config.php
+          dest: /var/www/wordpress/wp-config.php
+          owner: apache
+          group: apache
+          mode: '0644'
+
+- name: Importar archivo wordpress.conf(proxy)
+  template:
+          src: /home/vagrant/src/recursos/wordpress.conf.j2
+          dest: /etc/httpd/conf.d/wordpress.conf
+          owner: root
+          group: root
+          mode: '0644'
+
+- name: Reiniciar Apache web server
+  service:
+          name: httpd
+          state: restarted
+
+
+- name: Reiniciar servidor
+  reboot:
+          reboot_timeout: 60
+          post_reboot_delay: 30

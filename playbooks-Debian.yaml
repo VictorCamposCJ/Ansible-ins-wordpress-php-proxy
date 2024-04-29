@@ -1,0 +1,87 @@
+---
+#tasks file for ins-wordpress-conf-apache
+
+- name: Actualizar caché de los paquetes
+  apt:
+        name: '*'
+        state: latest
+        update_cache: true
+
+- name: Instalar paquetes requeridos
+  apt:
+        name:
+          - php
+          - apache2
+          - php-cli
+          - php-fpm
+          - php-mysql
+          - php-zip
+          - php-dev
+          - php-gd
+          - php-mcrypt
+          - php-mbstring
+          - php-curl
+          - php-xml
+          - php-pear
+          - php-bcmath
+        state: latest
+
+- name: Reiniciar modulo php-fpm si está instalado
+  service:
+          name: php7.3-fpm
+          state: restarted
+  when: ansible_facts['services']['php7.3-fpm'] is defined
+
+- name: Permitir tráfico HTTP a través del firewall
+  command: 
+    cmd: ufw allow http
+
+- name: Permitir tráfico HTTPS a través del firewall
+  command: 
+    cmd: ufw allow https
+
+- name: Recargar firewall
+  command: 
+    cmd: ufw reload
+
+- name: Iniciar Apache web server
+  service:
+          name: apache2
+          state: started
+          enabled: true
+
+- name: Copiar ficheros de WordPress(instalacion)
+  unarchive:
+          src: https://wordpress.org/latest.tar.gz
+          dest: /var/www/
+          remote_src: yes
+          owner: www-data
+          group: www-data
+          mode: '0755'
+
+- name: Establecer configuración de Wordpress
+  template:
+          src: /home/vagrant/src/recursos/wp-config.php
+          dest: /var/www/wordpress/wp-config.php
+          owner: www-data
+          group: www-data
+          mode: '0644'
+
+- name: Importar archivo wordpress.conf(proxy)
+  template:
+          src: /home/vagrant/src/recursos/000-default.conf.j2
+          dest: /etc/apache2/sites-available/000-default.conf
+          owner: root
+          group: root
+          mode: '0644'
+
+- name: Reiniciar Apache web server
+  service:
+          name: apache2
+          state: restarted
+
+- name: Reiniciar servidor
+  reboot:
+          reboot_timeout: 60
+          post_reboot_delay: 30
+
